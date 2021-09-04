@@ -1,4 +1,4 @@
-package vrtest;
+package esafetykrdl;
 
 import java.io.BufferedOutputStream;
 import java.io.File;
@@ -26,8 +26,8 @@ import io.github.cdimascio.dotenv.Dotenv;
 import io.github.cdimascio.dotenv.Dotenv.Filter;
 import io.github.cdimascio.dotenv.DotenvEntry;
 
-class VR {
-    private String vr_uri = "https://cp.esafetykorea.or.kr";
+class DL {
+    public String esafetykr_uri;
     private static String firefox = "Mozilla/5.0 (X11; Linux x86_64; rv:89.0) Gecko/20100101 Firefox/89.0";
     protected Map<String, String> cookies;
     protected HashMap<String, String> postData = new HashMap<String, String>();
@@ -50,18 +50,18 @@ class VR {
         }
     }
 
-    void vrCookies() throws IOException {
-        Response res = Jsoup.connect(vr_uri).header("User-Agent", firefox).header("Cache-control", "no-cache")
+    void esafetyCookies() throws IOException {
+        Response res = Jsoup.connect(esafetykr_uri).header("User-Agent", firefox).header("Cache-control", "no-cache")
                 .header("Cache-store", "no-store").maxBodySize(0).method(Method.GET).execute();
         cookies = res.cookies();
         doc = Jsoup.parse(res.body());
     }
 
-    void vrLoggedCookies() throws IOException {
+    void esafetyLoggedCookies() throws IOException {
         if (cookies == null)
             return;
         Response res = Jsoup
-                .connect(vr_uri + Arrays
+                .connect(esafetykr_uri + Arrays
                         .asList(doc.getElementsByAttributeValueMatching("type", "^((?![a-z|A-Z]).)*$").first()
                                 .toString().split("\'"))
                         .stream().filter(i -> i.contains("php")).collect(Collectors.toList()).get(0).replace("./", "/"))
@@ -69,30 +69,30 @@ class VR {
                 .cookies(cookies).execute();
         cookies = res.cookies();
         if (res.toString().contains("alert")
-                || !Jsoup.connect(vr_uri).cookies(cookies).maxBodySize(0).header("User-Agent", firefox)
+                || !Jsoup.connect(esafetykr_uri).cookies(cookies).maxBodySize(0).header("User-Agent", firefox)
                         .header("Cache-control", "no-cache").get().toString().contains("./bbs/logout.php"))
-            vrLoggedCookies();
+            esafetyLoggedCookies();
     }
 
     void locRepClass() throws IOException {
         String str = "";
-        doc = Jsoup.connect(vr_uri
+        doc = Jsoup.connect(esafetykr_uri
                 + (("/" + (str = doc.toString().replace("\"", "").split("\'")[1].replace("..", "").replace("//", "")))
                         .indexOf("//") == -1 ? "/" + str : str.replace("./", "/")))
                 .header("User-Agent", firefox).cookies(cookies).get();
     }
 
-    void vrClassPage() throws IOException {
+    void esafetyClassPage() throws IOException {
         if (classDoc != null || doc.body().childNodeSize() < 2) {
-            vrCookies();
+            esafetyCookies();
             getLogInPostData();
-            vrLoggedCookies();
+            esafetyLoggedCookies();
         }
-        doc = Jsoup.connect(vr_uri + doc.select("a:contains(강의)").first().attr("href").replace("./", "/"))
-                .header("User-Agent", firefox).header("Referer", vr_uri + "/").cookies(cookies).get();
+        doc = Jsoup.connect(esafetykr_uri + doc.select("a:contains(강의)").first().attr("href").replace("./", "/"))
+                .header("User-Agent", firefox).header("Referer", esafetykr_uri + "/").cookies(cookies).get();
         locRepClass();
         subjectTitle = doc.select("[class=subject]").last().text();
-        doc = Jsoup.connect(vr_uri + doc.select("a[href]").last().attr("href").replace("..", "").replace("//", ""))
+        doc = Jsoup.connect(esafetykr_uri + doc.select("a[href]").last().attr("href").replace("..", "").replace("//", ""))
                 .header("User-Agent", firefox).cookies(cookies).get();
         locRepClass();
 
@@ -102,8 +102,8 @@ class VR {
 
     }
 
-    void vrClass() throws IOException, InterruptedException {
-        vrClassPage();
+    void esafetyClass() throws IOException, InterruptedException {
+        esafetyClassPage();
         List<Element> lecList = doc.select("a[href]").stream().filter(a -> a.toString().contains("go_lecview"))
                 .collect(Collectors.toList());// lecview(vars)
         for (int a = 0; a < lecList.size(); a++) {
@@ -115,14 +115,14 @@ class VR {
                 e.printStackTrace();
             } catch (IndexOutOfBoundsException e) {
                 if (doc.body().text().isBlank())
-                    vrClassPage();
+                    esafetyClassPage();
             }
         }
     }
 
     void locRepLec() throws IOException {
         String str = "";
-        doc = Jsoup.connect(vr_uri + "/" + g4_lms_plug.replace("./", "").replace(" ", "")
+        doc = Jsoup.connect(esafetykr_uri + "/" + g4_lms_plug.replace("./", "").replace(" ", "")
                 + (("/" + (str = doc.toString().replace("\"", "").split("\'")[1].replace("..", "").replace("//", "")))
                         .indexOf("//") == -1 ? "/" + str : str.replace("./", "/")).replace("./", "player/"))
                 .header("User-Agent", firefox).cookies(cookies).get();
@@ -144,7 +144,7 @@ class VR {
         // for (int i = Integer.parseInt(params[3]); i <= maxPage; i++) {
         for (int i = 1; i <= maxPage; i++) {
             doc = Jsoup
-                    .connect(vr_uri + "/" + g4_lms_plug.replace("./", "").replace(".", "").replace(" ", "")
+                    .connect(esafetykr_uri + "/" + g4_lms_plug.replace("./", "").replace(".", "").replace(" ", "")
                             + "/player/index.php?p_id=" + params[0] + "&s_id=" + params[1] + "&wr_order=" + params[2]
                             + "&wr_page=" + /* params[3] */i + "&bid=" + params[4])
                     .header("User-Agent", firefox).cookies(cookies).get();
@@ -259,16 +259,17 @@ class VR {
         for (DotenvEntry e : Dotenv.configure().load().entries(Filter.DECLARED_IN_ENV_FILE)) {
             dotenv.put(e.getKey(), e.getValue());
         }
-        VR vr = new VR() {
+        DL dl = new DL() {
             {
                 username = dotenv.get("username");
                 password = dotenv.get("password");
+                esafetykr_uri = dotenv.get("url");
             }
         };
-        vr.vrCookies();
-        vr.getLogInPostData();
-        vr.vrLoggedCookies();
-        // vr.vrApply();
-        vr.vrClass();
+        dl.esafetyCookies();
+        dl.getLogInPostData();
+        dl.esafetyLoggedCookies();
+        // dl.esafetyApply();
+        dl.esafetyClass();
     }
 }
