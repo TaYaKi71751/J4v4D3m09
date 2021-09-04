@@ -8,6 +8,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.PrintWriter;
+import java.net.URL;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -26,7 +27,7 @@ import io.github.cdimascio.dotenv.Dotenv.Filter;
 import io.github.cdimascio.dotenv.DotenvEntry;
 
 class VR {
-    private String vr_uri = "https://vroongfriends.esafetykorea.or.kr";
+    private String vr_uri = "https://cp.esafetykorea.or.kr";
     private static String firefox = "Mozilla/5.0 (X11; Linux x86_64; rv:89.0) Gecko/20100101 Firefox/89.0";
     protected Map<String, String> cookies;
     protected HashMap<String, String> postData = new HashMap<String, String>();
@@ -34,6 +35,7 @@ class VR {
     protected Document doc, classDoc;
 
     HashMap<String, String> data = new HashMap<>();
+    private static String subjectTitle;
 
     void getLogInPostData() throws IOException {
         Elements elements = doc.getElementsByAttribute("name");
@@ -89,6 +91,7 @@ class VR {
         doc = Jsoup.connect(vr_uri + doc.select("a:contains(강의)").first().attr("href").replace("./", "/"))
                 .header("User-Agent", firefox).header("Referer", vr_uri + "/").cookies(cookies).get();
         locRepClass();
+        subjectTitle = doc.select("[class=subject]").last().text();
         doc = Jsoup.connect(vr_uri + doc.select("a[href]").last().attr("href").replace("..", "").replace("//", ""))
                 .header("User-Agent", firefox).cookies(cookies).get();
         locRepClass();
@@ -99,7 +102,7 @@ class VR {
 
     }
 
-    void vrClass() throws IOException {
+    void vrClass() throws IOException, InterruptedException {
         vrClassPage();
         List<Element> lecList = doc.select("a[href]").stream().filter(a -> a.toString().contains("go_lecview"))
                 .collect(Collectors.toList());// lecview(vars)
@@ -125,7 +128,7 @@ class VR {
                 .header("User-Agent", firefox).cookies(cookies).get();
     }
 
-    void go_lecview(String... params) throws IOException {
+    void go_lecview(String... params) throws IOException, InterruptedException {
         data = new HashMap<>();
         String lecTitle = doc.select("td[class]").stream().filter(a -> a.attr("class").toString().contains("title"))
                 .collect(Collectors.toList()).get((Integer.parseInt(params[2]) - 1)).text().replace(" ", "+");
@@ -137,8 +140,9 @@ class VR {
         doc = classDoc;
     }
 
-    void lecview(String lecTitle, Integer maxPage, String... params) throws IOException {
-        for (int i = Integer.parseInt(params[3]); i <= maxPage; i++) {
+    void lecview(String lecTitle, Integer maxPage, String... params) throws IOException, InterruptedException {
+        // for (int i = Integer.parseInt(params[3]); i <= maxPage; i++) {
+        for (int i = 1; i <= maxPage; i++) {
             doc = Jsoup
                     .connect(vr_uri + "/" + g4_lms_plug.replace("./", "").replace(".", "").replace(" ", "")
                             + "/player/index.php?p_id=" + params[0] + "&s_id=" + params[1] + "&wr_order=" + params[2]
@@ -151,16 +155,22 @@ class VR {
 
             doc = Jsoup.connect(doc.select("iframe[src]").last().attr("src")).header("User-Agent", firefox).get();
             if (doc.select("video[src]").size() != 0) {
-                System.out.println("./" + lecTitle + "/" + i + ".mp4");
-                tryToGetVideo(doc.select("video[src]").attr("src"), lecTitle, i);
+                System.out.println("./" + subjectTitle + "/" + lecTitle + "/" + (1000 + i) + ".mp4");
+                tryToGetVideo(doc.location().substring(0, doc.location().lastIndexOf("/")) + "/mp4/"
+                        + doc.location().split("/")[5].replaceAll("\\D", "") + ".mp4", lecTitle, 1000 + i);
                 continue;
             }
             if (doc.toString().contains("bg")) {
-                // System.out.println("./" + lecTitle + "/" + i + ".xml");
-                tryToGetXml(doc.location().replace(".html", ".xml"), lecTitle, i);
+                System.out.println("./" + subjectTitle + "/" + lecTitle + "/" + (1000 + i) + ".xml");
+                tryToGetXml(doc.location().replace(".html", ".xml"), lecTitle, 1000 + i);
                 continue;
             }
         }
+    }
+
+    private static File mkdir(String path) throws InterruptedException, IOException {
+        Runtime.getRuntime().exec("mkdir -p " + path).waitFor();
+        return new File(path);
     }
 
     private void getUpdate() throws IOException {
@@ -191,7 +201,7 @@ class VR {
         return;
     }
 
-    private static void tryToGetXml(String src, String lecTitle, Integer pageNum) throws IOException {
+    private void tryToGetXml(String src, String lecTitle, Integer pageNum) throws IOException, InterruptedException {
         try {
             getXml(src, lecTitle, pageNum);
         } catch (FileNotFoundException e) {
@@ -201,7 +211,7 @@ class VR {
         }
     }
 
-    private static void tryToGetVideo(String src, String lecTitle, Integer pageNum) throws IOException {
+    private void tryToGetVideo(String src, String lecTitle, Integer pageNum) throws IOException, InterruptedException {
         try {
             getVideo(src, lecTitle, pageNum);
         } catch (FileNotFoundException e) {
@@ -211,45 +221,30 @@ class VR {
         }
     }
 
-    private static void getXml(String src, String lecTitle, Integer pageNum) throws IOException {
+    // https://contents.esafetykorea.or.kr/[content|seoul]/^*[0-9]*$/js/[arrange|video|quiz].js
+    private void getXml(String src, String lecTitle, Integer pageNum) throws IOException, InterruptedException {
+        System.out.println(src.substring(src.lastIndexOf("/"), src.length()));
         String a = src.substring(src.lastIndexOf("/"), src.length()), str = null,
                 tagName = Jsoup
                         .parse(str = Jsoup.connect(src.replace(a, a.replace("/", "/xml/").replace(".html", ".xml")))
                                 .header("User-Agent", firefox).get().children().last().toString())
                         .body().children().last().tagName();
-        File folder = new File("./" + lecTitle);
-        if (!folder.exists()) {
-            try {
-                folder.mkdir();
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        }
-        try (PrintWriter out = new PrintWriter("./" + lecTitle + "/" + pageNum + "-" + tagName + ".xml")) {
+        File dir = mkdir("./dl/" + subjectTitle + "/" + lecTitle
+                + (new URL(doc.location()).getPath().substring(0, new URL(doc.location()).getPath().lastIndexOf("/")))
+                + "/xml");
+        try (PrintWriter out = new PrintWriter(dir.getPath() + "/" + pageNum + "-" + tagName + ".xml")) {
             out.println(str);
         }
         // https://stackoverflow.com/questions/1053467/how-do-i-save-a-string-to-a-text-file-using-java
     }
 
-    private static void getVideo(String src, String lecTitle, Integer pageNum) throws IOException {
-        int indexname = src.lastIndexOf("/");
-        File folder = new File("./" + lecTitle);
-        if (!folder.exists()) {
-            try {
-                folder.mkdir();
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        }
-        if (indexname == src.length()) {
-            src = src.substring(1, indexname);
-        }
-        indexname = src.lastIndexOf("/");
-        String name = src.substring(indexname, src.length());
-        System.out.println(name);
-        java.net.URL url = new java.net.URL(src);
-        InputStream in = url.openStream();
-        OutputStream out = new BufferedOutputStream(new FileOutputStream("./" + lecTitle + "/" + pageNum + ".mp4"));
+    private void getVideo(String src, String lecTitle, Integer pageNum) throws IOException, InterruptedException {
+        File dir = mkdir("./dl/" + subjectTitle + "/" + lecTitle
+                + (new URL(doc.location()).getPath().substring(0, new URL(doc.location()).getPath().lastIndexOf("/")))
+                + "/mp4");
+        System.out.println(src.substring(src.lastIndexOf("/"), src.length()));
+        InputStream in = new java.net.URL(src).openStream();
+        OutputStream out = new BufferedOutputStream(new FileOutputStream(dir.getPath() + "/" + pageNum + ".mp4"));
         for (int b; (b = in.read()) != -1;) {
             out.write(b);
         }
@@ -259,7 +254,7 @@ class VR {
         ///// https://examples.javacodegeeks.com/enterprise-java/html/download-images-from-a-website-using-jsoup/
     }
 
-    public static void main(String[] args) throws IOException {
+    public static void main(String[] args) throws IOException, InterruptedException {
         HashMap<String, String> dotenv = new HashMap<>();
         for (DotenvEntry e : Dotenv.configure().load().entries(Filter.DECLARED_IN_ENV_FILE)) {
             dotenv.put(e.getKey(), e.getValue());
