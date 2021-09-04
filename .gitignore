@@ -27,6 +27,8 @@ buildNumber.properties
 .project
 .vscode/
 
+#DL
+dl
 
 #
 #Dotenv File
