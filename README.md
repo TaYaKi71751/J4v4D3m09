@@ -1,5 +1,6 @@
 # esafetyKR
 [![](https://github.com/TaYaKi71751/esafetyKR/actions/workflows/main.yml/badge.svg)](https://github.com/TaYaKi71751/esafetyKR/actions/workflows/main.yml)
+# !DISCONTINUED
 > ## Config
 > ```
 > echo "username=$USERNAME \
