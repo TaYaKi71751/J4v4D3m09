@@ -38,7 +38,6 @@ jobs:
             sudo usermod -aG docker $USER
             docker build --force-rm --tag dockerfile:build .
             docker run -i -v $(pwd):/data dockerfile:build
-            ls -la $(pwd)/target
         - uses: "marvinpinto/action-automatic-releases@latest"
           with:
             repo_token: "${{ secrets.GITHUB_TOKEN }}"
@@ -46,7 +45,7 @@ jobs:
             prerelease: true
             title: "Development Build"
             files: |
-              LICENSE.txt
+              LICENSE*
               target/*.jar
         - uses: actions/upload-artifact@v2
           with:
